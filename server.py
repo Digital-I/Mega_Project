@@ -1,6 +1,8 @@
 # server.py
-import socket
-import threading
+import pickle, socket, threading
+from random import randint
+from certificate import Certificate
+from user import User
 
 my_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 PORT = 8000
@@ -8,26 +10,40 @@ ADDRESS = "0.0.0.0"
 broadcast_list = []
 my_socket.bind((ADDRESS, PORT))
 
+root = randint(1, 9)
+mod = randint(1, 100)
+certificate = Certificate(root, mod)
 
 def accept_loop():
     while True:
         my_socket.listen()
         client, client_address = my_socket.accept()
-        broadcast_list.append(client)
-        start_listenning_thread(client)
+        username = client.recv(1024).decode()
 
+        # отправка данных для получения ключа
+        message = {'root': root, 'mod': mod, 'open_num': certificate.open_num}
+        message = pickle.dumps(message)
+        client.send(message)
 
-def start_listenning_thread(client):
+        # получение открытого ключа
+        certificate.get_connection(client.recv(1024).decode())
+
+        user = User(client, username, certificate.common_key)
+        broadcast_list.append(user)
+        start_listenning_thread(user)
+        # TODO вынести в отдельны поток регестрацию
+
+# Осуществляем подключение клиента
+def start_listenning_thread(user):
     client_thread = threading.Thread(
         target=listen_thread,
-        args=(client,)  # the list of argument for the function
+        args=(user,)  # the list of argument for the function
     )
     client_thread.start()
 
-
-def listen_thread(client):
+def listen_thread(user):
     while True:
-        message = client.recv(1024).decode()
+        message = user.client.recv(1024).decode()
         if message:
             print(f"Received message : {message}")
             broadcast(message)
@@ -37,12 +53,18 @@ def listen_thread(client):
 
 
 def broadcast(message):
-    for client in broadcast_list:
+    for user in broadcast_list:
         try:
-            client.send(message.encode())
-        except:
-            broadcast_list.remove(client)
-            print(f"Client removed : {client}")
+            user.client.send(message.encode())
+        except Exception:
+            broadcast_list.remove(user)
+            print(f"Client removed : {user.user_name}")
 
+def thread_sending():
+    while True:
+        message_to_send = input()
+        if message_to_send:
+            broadcast('SERVER' + " : " + message_to_send)
 
+threading.Thread(target=thread_sending).start()
 accept_loop()
