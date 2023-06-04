@@ -1,17 +1,19 @@
 # server.py
-import pickle, socket, threading
+import pickle, socket, threading, hashlib
 from random import randint
 from certificate import Certificate
 from user import User
+from vizhiner import encrypt, decrypt
 
 my_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 PORT = 8000
 ADDRESS = "0.0.0.0"
 broadcast_list = []
 my_socket.bind((ADDRESS, PORT))
 
 root = randint(1, 9)
-mod = randint(1, 100)
+mod = 100000
 certificate = Certificate(root, mod)
 
 def accept_loop():
@@ -28,7 +30,8 @@ def accept_loop():
         # получение открытого ключа
         certificate.get_connection(client.recv(1024).decode())
 
-        user = User(client, username, certificate.common_key)
+        hash_key = hashlib.sha256(str(certificate.common_key).encode('utf-8')).digest()
+        user = User(client, username, hash_key)
         broadcast_list.append(user)
         start_listenning_thread(user)
         # TODO вынести в отдельны поток регестрацию
@@ -55,10 +58,11 @@ def listen_thread(user):
 def broadcast(message):
     for user in broadcast_list:
         try:
+            message = encrypt(message, user.key)
             user.client.send(message.encode())
-        except Exception:
+        except Exception(e):
             broadcast_list.remove(user)
-            print(f"Client removed : {user.user_name}")
+            print(f"Client removed : {user.user_name}, {e}")
 
 def thread_sending():
     while True:

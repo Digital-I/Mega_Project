@@ -7,7 +7,7 @@ class Certificate:
     def __init__(self, root, mod):
         self.root = int(root)
         self.mod = int(mod)
-        self.person_num = randint(1, 9)
+        self.person_num = randint(1, 100)
         self.open_num = root**self.person_num % self.mod
 
     def get_connection(self, _open):
