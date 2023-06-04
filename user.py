@@ -1,5 +1,6 @@
 import socket
 
+
 class User:
     client: socket
     user_name: str

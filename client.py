@@ -3,28 +3,29 @@ import socket
 import threading
 import vizhiner
 from certificate import Certificate
-import pickle
+
 
 # TODO добавить проверку на коллизию
-nickname = input("Choose your nickname : ").strip()
+nickname = input("Введите свой ник : ").strip()
 while not nickname:
-    nickname = input("Your nickname should not be empty : ").strip()
+    nickname = input("Ник не должен быть пустым : ").strip()
 
 my_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 host = "localhost"  # "127.0.1.1"
 port = 8000
 my_socket.connect((host, port))
+my_socket.send(nickname.encode('utf-8'))
 
-my_socket.send(nickname.encode())
 
 # обмен ключами
-rmo = pickle.loads(my_socket.recv(1024))
-certificate = Certificate(rmo['root'], rmo['mod'])
-certificate.get_connection(rmo['open_num'])
-my_socket.send(str(certificate.open_num).encode())
+root_mod_openkey = eval(my_socket.recv(1024).decode('utf-8'))
+certificate = Certificate(root_mod_openkey['root'], root_mod_openkey['mod'])
+certificate.get_connection(root_mod_openkey['open_key'])
+my_socket.send(str(certificate.open_key).encode())
 
 # TODO сделать сохраненеие в файле, а там и авторизацию можно подогнать в отдельном скрипте
-common_key = certificate.common_key
+shared_secret_key = certificate.shared_secret_key
+
 
 # отправляем сообщение
 def thread_sending():

@@ -1,5 +1,6 @@
 # server.py
-import pickle, socket, threading
+import socket
+import threading
 from random import randint
 from certificate import Certificate
 from user import User
@@ -14,6 +15,7 @@ root = randint(1, 9)
 mod = randint(1, 100)
 certificate = Certificate(root, mod)
 
+
 def accept_loop():
     while True:
         my_socket.listen()
@@ -21,17 +23,17 @@ def accept_loop():
         username = client.recv(1024).decode()
 
         # отправка данных для получения ключа
-        message = {'root': root, 'mod': mod, 'open_num': certificate.open_num}
-        message = pickle.dumps(message)
-        client.send(message)
+        message = str({'root': root, 'mod': mod, 'open_key': certificate.open_key})
+        client.send(bytes(message, 'utf-8'))
 
         # получение открытого ключа
         certificate.get_connection(client.recv(1024).decode())
 
-        user = User(client, username, certificate.common_key)
+        user = User(client, username, certificate.shared_secret_key)
         broadcast_list.append(user)
         start_listenning_thread(user)
         # TODO вынести в отдельны поток регестрацию
+
 
 # Осуществляем подключение клиента
 def start_listenning_thread(user):
@@ -41,14 +43,15 @@ def start_listenning_thread(user):
     )
     client_thread.start()
 
+
 def listen_thread(user):
     while True:
         message = user.client.recv(1024).decode()
         if message:
-            print(f"Received message : {message}")
+            print(message)
             broadcast(message)
         else:
-            print(f"client has been disconnected : {client}")
+            print(f"client has been disconnected : {user.client}")
             return
 
 
@@ -60,11 +63,13 @@ def broadcast(message):
             broadcast_list.remove(user)
             print(f"Client removed : {user.user_name}")
 
+
 def thread_sending():
     while True:
         message_to_send = input()
         if message_to_send:
             broadcast('SERVER' + " : " + message_to_send)
+
 
 threading.Thread(target=thread_sending).start()
 accept_loop()
