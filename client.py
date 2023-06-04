@@ -1,8 +1,9 @@
 # client.py
 import socket
 import threading
-import vizhiner
 from certificate import Certificate
+from vizhiner import encrypt, decrypt
+import hashlib
 
 
 # TODO добавить проверку на коллизию
@@ -22,28 +23,28 @@ root_mod_openkey = eval(my_socket.recv(1024).decode('utf-8'))
 certificate = Certificate(root_mod_openkey['root'], root_mod_openkey['mod'])
 certificate.get_connection(root_mod_openkey['open_key'])
 my_socket.send(str(certificate.open_key).encode())
+# на основе общего секретного ключа генерируем md5 для шифрование Вижинера
+shared_secret_key = hashlib.md5(bytes(str(certificate.shared_secret_key), 'utf-8')).hexdigest()
 
-# TODO сделать сохраненеие в файле, а там и авторизацию можно подогнать в отдельном скрипте
-shared_secret_key = certificate.shared_secret_key
 
-
-# отправляем сообщение
+# поток на отправку смс
 def thread_sending():
     while True:
         message_to_send = input()
         if message_to_send:
-            message_with_nickname = nickname + " : " + message_to_send
-            my_socket.send(message_with_nickname.encode())
+            my_socket.send(encrypt(message_to_send, shared_secret_key).encode())
 
 
-# принемаем сообщение
+# поток на получение смс
 def thread_receiving():
     while True:
         message = my_socket.recv(1024).decode()
-        print(message)
+        print(f"Server: {decrypt(message, shared_secret_key)}")
 
 
+# создаем 2 потока на отправку и получение смс
 thread_send = threading.Thread(target=thread_sending)
 thread_receive = threading.Thread(target=thread_receiving)
+# запускаем 2 потока на отправку и получение смс
 thread_send.start()
 thread_receive.start()
